@@ -1,6 +1,11 @@
 # Resources
 # https://www.scrapingbee.com/blog/selenium-python/
 # https://stackoverflow.com/questions/1066933/how-to-extract-top-level-domain-name-tld-from-url
+# https://github.com/wkeeling/selenium-wire
+# https://stackoverflow.com/questions/56705650/how-to-capture-network-traffic-with-selenium
+# https://www.geeksforgeeks.org/packet-sniffing-using-scapy/
+
+
 
 # Diagram
 # ------> Browser launched
