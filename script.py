@@ -1,6 +1,8 @@
 # Resources
 # https://www.scrapingbee.com/blog/selenium-python/
+# https://stackoverflow.com/questions/1066933/how-to-extract-top-level-domain-name-tld-from-url
 
+# Diagram
 # ------> Browser launched
 #       ------> Start capturing packets
 #              ------> Connect to webpage
@@ -10,54 +12,101 @@
 # ------> Browser closed
 
 # Sidenote:
-# Not sure if its better to
+# Not sure whats best to capture packets
 # Researching it looks like tcpdump is better for live captures
+# This command allows for user to run tcpdump without sudo: 
+# sudo setcap cap_net_raw,cap_net_admin=eip $(which tcpdump)
 
 # To consider:
-# Multithreading
-# 
+# How does tcpdump work when we implement multithreading
+# Need to do further research (we don't want to mix up the packets from different webpages)
 
 import subprocess
 import time
-import threading
+# import threading
+import os
 from selenium import webdriver
 import tldextract
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+os.makedirs("networks", exist_ok=True)
+os.makedirs("screenshots", exist_ok=True)
 
 # Helper function to get the top level domain name
 def get_domain_name(url):
     extracted = tldextract.extract(url)
     return extracted.domain
 
-# from selenium.webdriver.chrome.service import Service
-# from selenium.webdriver.chrome.options import Options
-# from webdriver_manager.chrome import ChromeDriverManager
-
+# Helper function to get the list of websites to be scraped
 def fetch_websites():
     websites = []
     with open('websites.txt', 'r') as file:
         for line in file:
             websites.append(line.strip())
-
     return websites
 
+def start_capturing(website):
+
+    domain = get_domain_name(website)
+    pcap_file = f"networks/{domain}.pcap"
+
+    tcpdump_cmd = ["tcpdump", "-i", "any", "-w", pcap_file]
+    
+    try:
+        # run tcpdump subprocess
+        tcpdump_process = subprocess.Popen(tcpdump_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return tcpdump_process
+    except Exception as e:
+        print(f"Error starting tcpdump for {website}: {e}")
+        return None
+
+def stop_capturing(capture):
+    # Check if process is still running
+    if capture.poll() is None:
+        capture.terminate()
+        capture.wait()
+        
+    # # Stop packet capture
+    # capture.terminate()
+    # subprocess.run(["sudo", "killall", "tcpdump"])
+
+def load_webpage(driver, website):
+    
+    try:
+        # Visit the website
+        driver.get(website)
+        # Wait for the page to load by checking for the presence of the <body> tag
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        print(f"Successfully loaded: {website}")
+        
+    except Exception as e:
+        print(f"Error loading {website}: {e}")
+        
+def screenshot(driver, website):
+    filename = get_domain_name(website)
+    filename = f"screenshots/{filename}.png"
+    driver.save_screenshot(filename)
+    
 def browser(website):
     
-    # # For headless mode
-    # options = Options()
+    options = Options()
+    # For headless mode
     # options.add_argument("--headless")
-    # service = Service(ChromeDriverManager().install())
-    # driver = webdriver.Chrome(service=service, options=options)
     
-    # Initialise Selenium WebDriver
-    driver = webdriver.Chrome()
+    # Initialise driver
+    driver = webdriver.Chrome(options=options)
     
     # Begin capturing packets
     capture = start_capturing(website)
     
-    # Connect to webpage
+    # Load the webpage
     load_webpage(driver, website)
     
     # Take a screenshot of the loaded page
+    # Not sure how to determine if a page is fully loaded
     screenshot(driver, website)
     
     # Stop capturing packets
@@ -65,52 +114,19 @@ def browser(website):
     
     # Quit the browser
     driver.quit()
-
-def start_capturing(website):
-
-    res = get_domain_name(website)
-    pcap_file = f"{res}.pcap"
-
-    # Start packet capture before launching the browser (running tcpdump in the background)
-    tcpdump_cmd = ["sudo", "tcpdump", "-i", "any", "-w", pcap_file]
-    tcpdump_process = subprocess.Popen(tcpdump_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    return tcpdump_process
-
-def stop_capturing(capture):
-    if capture.poll() is None:  # Check if process is still running
-        capture.terminate()
-        capture.wait()
-    # # Stop packet capture
-    # capture.terminate()
-    # subprocess.run(["sudo", "killall", "tcpdump"])  # Ensure tcpdump stops completely
-
-def load_webpage(driver, website):
-    
-    try:
-        # Visit the website
-        driver.get(website)
-
-        # Allow time for page to load
-        time.sleep(3)
-        
-    except Exception as e:
-        print(f"Error loading {website}: {e}")
-        
-def screenshot(driver, website):
-    filename = get_domain_name(website)
-    filename = f"{filename}.png"
-    driver.save_screenshot(filename)
     
 if __name__ == "__main__":
     
     websites = fetch_websites()
 
-    threads = []
     for website in websites:
-        t = threading.Thread(target=browser, args=(website,))
-        threads.append(t)
-        t.start()
+        browser(website)
 
-    for t in threads:
-        t.join()
+    # threads = []
+    # for website in websites:
+    #     t = threading.Thread(target=browser, args=(website,))
+    #     threads.append(t)
+    #     t.start()
+
+    # for t in threads:
+    #     t.join()

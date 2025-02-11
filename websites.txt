@@ -1,4 +1,4 @@
-www.google.com
-www.facebook.com
-www.youtube.com
-www.unsw.edu.au
+https://www.google.com
+https://www.facebook.com
+https://www.youtube.com
+https://www.unsw.edu.au
